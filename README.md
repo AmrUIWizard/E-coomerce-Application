@@ -6,10 +6,10 @@ This document describes the database schema, entity relationships, and example a
 
 ## 1. Database Schema
 
-### customers
+### Customer
 ```sql
-CREATE TABLE customers (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE customer (
+    customer_id SERIAL PRIMARY KEY,
     email VARCHAR(100) NOT NULL UNIQUE,
     password TEXT NOT NULL,
     first_name VARCHAR(100) NOT NULL,
@@ -17,18 +17,18 @@ CREATE TABLE customers (
 );
 ```
 
-### categories
+### Category
 ```sql
-CREATE TABLE categories (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE category (
+    category_id SERIAL PRIMARY KEY,
     category_name VARCHAR(100) NOT NULL UNIQUE
 );
 ```
 
-### products
+### Product
 ```sql
-CREATE TABLE products (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE product (
+    product_id SERIAL PRIMARY KEY,
     category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
     description TEXT,
@@ -37,10 +37,10 @@ CREATE TABLE products (
 );
 ```
 
-### orders
+### Order
 ```sql
-CREATE TABLE orders (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE order (
+    order_id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     order_date TIMESTAMP NOT NULL DEFAULT NOW(),
     total_amount NUMERIC(10, 2) NOT NULL,
@@ -48,10 +48,10 @@ CREATE TABLE orders (
 );
 ```
 
-### order_details
+### Order Details
 ```sql
 CREATE TABLE order_details (
-    id SERIAL PRIMARY KEY,
+    order_detail_id SERIAL PRIMARY KEY,
     order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     unit_price NUMERIC(10, 2) NOT NULL,
@@ -65,10 +65,11 @@ CREATE TABLE order_details (
 
 | Parent     | Child         | Relationship | Foreign Key              |
 | ---------- | ------------- | ------------ | ------------------------ |
-| customers  | orders        | 1 : M        | orders.customer_id       |
-| categories | products      | 1 : M        | products.category_id     |
+| customers  | order         | 1 : M        | orders.customer_id       |
+| categories | product       | 1 : M        | products.category_id     |
 | orders     | order_details | 1 : M        | order_details.order_id   |
 | products   | order_details | 1 : M        | order_details.product_id |
+|            |               |              |                          |
 
 ---
 
@@ -76,13 +77,16 @@ CREATE TABLE order_details (
 ![ERD Diagram](erd_diagram.png)
 
 ---
-
 ## 4. Analytical SQL Queries
-This section includes useful SQL queries for getting insights from the e-commerce data. These examples show how to check daily revenue, find top-selling products, and see which customers spent the most in a given period.
+
+This section includes useful SQL queries for getting insights from the e-commerce data. These examples show how to check daily revenue, find top-selling products, and identify high-value customers.
+
+---
 
 ### 4.1 Daily Revenue Report
+
 ```sql
-SELECT 
+SELECT
     DATE(order_date) AS report_date,
     SUM(total_amount) AS total_revenue
 FROM orders
@@ -90,36 +94,45 @@ WHERE DATE(order_date) = DATE '2025-01-18'
 GROUP BY DATE(order_date);
 ```
 
+---
+
 ### 4.2 Top-Selling Products in a Month
+
 ```sql
 SELECT
-    p.id AS product_id,
+    p.product_id,
     p.name AS product_name,
     SUM(od.unit_price * od.quantity) AS total_revenue
 FROM order_details od
-JOIN orders o ON od.order_id = o.id
-JOIN products p ON od.product_id = p.id
+JOIN orders o ON od.order_id = o.order_id
+JOIN products p ON od.product_id = p.product_id
 WHERE DATE_TRUNC('month', o.order_date) = DATE_TRUNC('month', DATE '2025-01-01')
-GROUP BY p.id, p.name
+GROUP BY p.product_id, p.name
 ORDER BY total_revenue DESC
 LIMIT 3;
 ```
 
+---
+
 ### 4.3 Customers Who Spent More Than 500 in a Month
+
 ```sql
 SELECT
-    c.id AS customer_id,
+    c.customer_id,
     CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
     SUM(o.total_amount) AS total_spent
 FROM customers c
-JOIN orders o ON o.customer_id = c.id
-WHERE DATE_TRUNC('month', o.order_date) = DATE '2025-01-01'
-GROUP BY c.id, customer_name
+JOIN orders o ON o.customer_id = c.customer_id
+WHERE DATE_TRUNC('month', o.order_date) = DATE_TRUNC('month', DATE '2025-01-01')
+GROUP BY c.customer_id, customer_name
 HAVING SUM(o.total_amount) > 500
 ORDER BY total_spent DESC;
 ```
 
-### 4.4 Search for products containing the word `camera` in either the product name or description
+---
+
+### 4.4 Search for Products Containing the Word `camera`
+
 ```sql
 SELECT *
 FROM products
@@ -127,20 +140,26 @@ WHERE name ILIKE '%camera%'
    OR description ILIKE '%camera%';
 ```
 
-### 4.5 Suggest popular products from the same category by the same author, excluding the selected product
+---
+
+### 4.5 Suggest Popular Products From the Same Category, Excluding the Selected Product
+
 ```sql
 SELECT *
 FROM products
 WHERE category_id = <category_id>
-  AND id != <product_id>; 
+  AND product_id != <product_id>
+ORDER BY stock_quantity DESC
+LIMIT 5;
 ```
+
 ---
 
 ## 5. Denormalization Notes
 The `orders` table includes a denormalized `customer_name` column.  
 This stores the customer's full name at the time of order creation.  
 ```sql
-ALTER TABLE orders
+ALTER TABLE order
 ADD COLUMN customer_name VARCHAR(200);
 ```
 
