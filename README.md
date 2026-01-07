@@ -119,6 +119,21 @@ HAVING SUM(o.total_amount) > 500
 ORDER BY total_spent DESC;
 ```
 
+### 4.4 Search for products containing the word `camera` in either the product name or description
+```sql
+SELECT *
+FROM products
+WHERE name ILIKE '%camera%'
+   OR description ILIKE '%camera%';
+```
+
+### 4.5 Suggest popular products from the same category by the same author, excluding the selected product
+```sql
+SELECT *
+FROM products
+WHERE category_id = <category_id>
+  AND id != <product_id>; 
+```
 ---
 
 ## 5. Denormalization Notes
