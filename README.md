@@ -5,9 +5,11 @@ This document describes the database schema, entity relationships, and example a
 ---
 
 ## 1. Database Schema
+This section defines the core database structure used to store and manage e-commerce data efficiently.
 
-### Customer
 ```sql
+CREATE DATABASE ecommerce
+
 CREATE TABLE customer (
     customer_id SERIAL PRIMARY KEY,
     email VARCHAR(100) NOT NULL UNIQUE,
@@ -15,45 +17,33 @@ CREATE TABLE customer (
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL
 );
-```
 
-### Category
-```sql
 CREATE TABLE category (
     category_id SERIAL PRIMARY KEY,
     category_name VARCHAR(100) NOT NULL UNIQUE
 );
-```
 
-### Product
-```sql
 CREATE TABLE product (
     product_id SERIAL PRIMARY KEY,
-    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    category_id INTEGER NOT NULL REFERENCES categorغ(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
     description TEXT,
     price NUMERIC(10, 2) NOT NULL,
     stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0)
 );
-```
 
-### Order
-```sql
 CREATE TABLE order (
     order_id SERIAL PRIMARY KEY,
-    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    customer_id INTEGER NOT NULL REFERENCES customer(id) ON DELETE CASCADE,
     order_date TIMESTAMP NOT NULL DEFAULT NOW(),
-    total_amount NUMERIC(10, 2) NOT NULL,
+    total_amount NUMERIC(10, 2) NOT NULL CHECK (total_amount >= 0),
     customer_name VARCHAR(200)      -- denormalized snapshot field
 );
-```
 
-### Order Details
-```sql
 CREATE TABLE order_details (
     order_detail_id SERIAL PRIMARY KEY,
-    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    order_id INTEGER NOT NULL REFERENCES order(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES product(id) ON DELETE CASCADE,
     unit_price NUMERIC(10, 2) NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity >= 1)
 );
@@ -62,6 +52,7 @@ CREATE TABLE order_details (
 ---
 
 ## 2. Entity Relationships
+This section explains how the main tables are connected and how data flows between tables
 
 | Parent     | Child         | Relationship | Foreign Key              |
 | ---------- | ------------- | ------------ | ------------------------ |
@@ -69,19 +60,17 @@ CREATE TABLE order_details (
 | categories | product       | 1 : M        | products.category_id     |
 | orders     | order_details | 1 : M        | order_details.order_id   |
 | products   | order_details | 1 : M        | order_details.product_id |
-|            |               |              |                          |
+
 
 ---
 
 ## 3. ERD Diagram
+This section provides a visual representation of the database schema and the relationships between its entities.
 ![ERD Diagram](erd_diagram.png)
 
 ---
 ## 4. Analytical SQL Queries
-
 This section includes useful SQL queries for getting insights from the e-commerce data. These examples show how to check daily revenue, find top-selling products, and identify high-value customers.
-
----
 
 ### 4.1 Daily Revenue Report
 
@@ -93,8 +82,6 @@ FROM orders
 WHERE DATE(order_date) = DATE '2025-01-18'
 GROUP BY DATE(order_date);
 ```
-
----
 
 ### 4.2 Top-Selling Products in a Month
 
@@ -112,8 +99,6 @@ ORDER BY total_revenue DESC
 LIMIT 3;
 ```
 
----
-
 ### 4.3 Customers Who Spent More Than 500 in a Month
 
 ```sql
@@ -129,8 +114,6 @@ HAVING SUM(o.total_amount) > 500
 ORDER BY total_spent DESC;
 ```
 
----
-
 ### 4.4 Search for Products Containing the Word `camera`
 
 ```sql
@@ -139,8 +122,6 @@ FROM products
 WHERE name ILIKE '%camera%'
    OR description ILIKE '%camera%';
 ```
-
----
 
 ### 4.5 Suggest Popular Products From the Same Category, Excluding the Selected Product
 
@@ -156,6 +137,8 @@ LIMIT 5;
 ---
 
 ## 5. Denormalization Notes
+This section highlights fields that store redundant or snapshot data to improve query performance and simplify reporting,
+
 The `orders` table includes a denormalized `customer_name` column.  
 This stores the customer's full name at the time of order creation.  
 ```sql
