@@ -224,7 +224,7 @@ $$ LANGUAGE plpgsql;
 
  Generates sample products (default 100k rows) with names, descriptions, prices, stock quantities, and assigns them to categories.
 ```sql
-CREATE OR REPLACE FUNCTION generate_products_data(num_rows INTEGER DEFAULT 100000)
+CREATE OR REPLACE FUNCTION generate_categories_data(num_rows INTEGER DEFAULT 100000)
 RETURNS VOID AS $$
 DECLARE
     cat_count INTEGER;
