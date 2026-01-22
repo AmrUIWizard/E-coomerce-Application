@@ -222,22 +222,14 @@ $$ LANGUAGE plpgsql;
 
 ### 6.2 Categories Data Generation Function
 
- Generates sample products (default 100k rows) with names, descriptions, prices, stock quantities, and assigns them to categories.
+ Generates sample categories (default 100 rows) with names assigns them to categories.
 ```sql
-CREATE OR REPLACE FUNCTION generate_categories_data(num_rows INTEGER DEFAULT 100000)
+CREATE OR REPLACE FUNCTION generate_categories_data(num_rows INTEGER DEFAULT 100)
 RETURNS VOID AS $$
-DECLARE
-    cat_count INTEGER;
 BEGIN
-    SELECT COUNT(*) INTO cat_count FROM category;
-
-    INSERT INTO product (category_id, name, description, price, stock_quantity)
+    INSERT INTO category (category_name)
     SELECT
-        ((gs - 1) % cat_count) + 1,
-        'Product ' || gs,
-        'Description for product ' || gs,
-        gs,
-        gs
+        'Category name ' || gs
     FROM generate_series(1, num_rows) AS gs;
 END;
 $$ LANGUAGE plpgsql;
@@ -256,11 +248,11 @@ BEGIN
 
     INSERT INTO product (category_id, name, description, price, stock_quantity)
     SELECT
-        ((gs - 1) % cat_count) + 1,
+        floor(random() * cat_count + 1)::INTEGER,
         'Product ' || gs,
         'Description for product ' || gs,
-        gs,
-        gs
+        (random() * 500 + 5)::DECIMAL(10,2),
+        floor(random() * 10 + 1)::INTEGER
     FROM generate_series(1, num_rows) AS gs;
 END;
 $$ LANGUAGE plpgsql;
@@ -278,19 +270,18 @@ DECLARE
     cus_count INTEGER;
     prod_count INTEGER;
 BEGIN
-    TRUNCATE order_details CASCADE;
-    TRUNCATE orders CASCADE;
-
+    -- Count customers and products
     SELECT COUNT(*) INTO cus_count FROM customer;
     SELECT COUNT(*) INTO prod_count FROM product;
 
+    -- Step 1: Insert orders with total_amount 0
     WITH new_orders AS (
-        INSERT INTO orders (customer_id, order_date, total_amount, customer_name)
+        INSERT INTO orders (customer_id, order_date, customer_name, total_amount)
         SELECT
             floor(random() * cus_count + 1)::INTEGER,
-            CURRENT_DATE - (random() * 1825)::INTEGER,
-            (random() * 1000 + 10)::DECIMAL(10,2),
-            CONCAT(c.first_name, ' ', c.last_name)
+            CURRENT_DATE - floor(random() * 1825)::INTEGER,
+            CONCAT(c.first_name, ' ', c.last_name),
+            0
         FROM generate_series(1, num_orders) AS gs
         CROSS JOIN LATERAL (
             SELECT first_name, last_name
@@ -298,15 +289,39 @@ BEGIN
             WHERE customer_id = floor(random() * cus_count + 1)::INTEGER
         ) AS c
         RETURNING order_id
+    ),
+    -- Step 2: Assign exactly one product per order (cycling if needed)
+    products_random AS (
+        SELECT product_id, price, row_number() OVER (ORDER BY random()) AS rn
+        FROM product
+    ),
+    new_order_details AS (
+        SELECT
+            o.order_id,
+            p.product_id,
+            p.price AS unit_price,
+            floor(random() * 10 + 1)::INTEGER AS quantity
+        FROM new_orders o
+        JOIN LATERAL (
+            SELECT product_id, price
+            FROM products_random
+            WHERE rn = ((o.order_id - 1) % prod_count) + 1  -- cycle through products
+        ) AS p ON TRUE
     )
     INSERT INTO order_details (order_id, product_id, unit_price, quantity)
-    SELECT
-        o.order_id,
-        floor(random() * prod_count + 1)::INTEGER,
-        (random() * 500 + 5)::DECIMAL(10,2),
-        floor(random() * 10 + 1)::INTEGER
-    FROM new_orders o
-    CROSS JOIN generate_series(1, floor(random() * 4 + 1)::INTEGER) AS item_num;
+    SELECT *
+    FROM new_order_details;
+
+    -- Step 3: Update orders.total_amount
+    UPDATE orders o
+    SET total_amount = od.total
+    FROM (
+        SELECT order_id, SUM(unit_price * quantity)::DECIMAL(10,2) AS total
+        FROM order_details
+        GROUP BY order_id
+    ) od
+    WHERE o.order_id = od.order_id;
+
 END;
 $$ LANGUAGE plpgsql;
 ```
