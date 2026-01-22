@@ -1,15 +1,51 @@
-# E-Commerce Database Documentation
+# E-Commerce Database System
 
-This document describes the database schema, entity relationships, and example analytical SQL queries used in the e-commerce system. The goal is to provide a clear, professional overview for development and showcase purposes.
+This project documents the database design for a relational e-commerce system.
+It includes the schema definition, entity relationships, analytical SQL queries,
+and utility functions for generating and managing test data.
 
 ---
 
-## 1. Database Schema
-This section defines the core database structure used to store and manage e-commerce data efficiently.
+## Table of Contents
+- [1. Project Overview](#1-project-overview)
+- [2. Database Schema](#2-database-schema)
+- [3. Entity Relationships](#3-entity-relationships)
+- [4. ERD Diagram](#4-erd-diagram)
+- [5 Analytical SQL Queries](#1-analytical-sql-queries)
+	- [5.1 Daily Revenue Report](#51-daily-revenue-report)
+	- [5.2 Top-Selling Products in a Month](#52-top-selling-products-in-a-month)
+	- [5.3 Customers Who Spent More Than 500 in a Month](#53-customers-who-spent-more-than-500-in-a-month)
+	- [5.4 Search for Products Containing the Word camera](#54-search-for-products-containing-the-word-camera)
+	- [5.5 Suggest Popular Products From the Same Category](#55-suggest-popular-products-from-the-same-category)
+- [6 Data Generation](#6-data-generation)
+	- [6.1 Customer Data Generation Function](#61-customer-data-generation-function)
+	- [6.2 Categories Data Generation Function](#62-categories-data-generation-function)
+	- [6.3 Products Data Generation Function](#63-products-data-generation-function)
+	- [6.4 Orders and Order Details Generation Function](#64-orders-and-order-details-generation-function)
+
+
+
+
+---
+
+## 1 Project Overview
+
+This database is designed to support a basic e-commerce platform.
+It handles customer management, product cataloging, order processing,
+and analytical reporting.
+
+The schema follows relational database best practices while allowing
+selective denormalization for reporting performance.
+
+---
+
+## 2 Database Schema
+
+This section defines the core tables used to store and manage
+e-commerce data. The schema is designed for data integrity,
+scalability, and analytical querying.
 
 ```sql
-CREATE DATABASE ecommerce
-
 CREATE TABLE customer (
 customer_id SERIAL PRIMARY KEY,
 email VARCHAR(100) NOT NULL UNIQUE,
@@ -22,7 +58,7 @@ CREATE TABLE category (
 category_id SERIAL PRIMARY KEY,
 category_name VARCHAR(100) NOT NULL UNIQUE
 );
-  
+
 CREATE TABLE product (
 product_id SERIAL PRIMARY KEY,
 category_id INTEGER NOT NULL REFERENCES category(category_id) ON DELETE CASCADE,
@@ -51,8 +87,10 @@ quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity >= 1)
 
 ---
 
-## 2. Entity Relationships
-This section explains how the main tables are connected and how data flows between tables
+## 3 Entity Relationships
+
+The following table describes how entities are connected and
+how data flows between them.
 
 | Parent   | Child         | Relationship | Foreign Key              |
 | -------- | ------------- | ------------ | ------------------------ |
@@ -61,18 +99,27 @@ This section explains how the main tables are connected and how data flows betwe
 | order    | order_details | 1 : M        | order_details.order_id   |
 | product  | order_details | 1 : M        | order_details.product_id |
 
-
 ---
 
-## 3. ERD Diagram
-This section provides a visual representation of the database schema and the relationships between its entities.
+## 4 ERD Diagram
+
+The Entity Relationship Diagram (ERD) below visually represents
+the database structure and the relationships between entities.
+
 ![ERD Diagram](erd_diagram.png)
 
 ---
-## 4. Analytical SQL Queries
-This section includes useful SQL queries for getting insights from the e-commerce data. These examples show how to check daily revenue, find top-selling products, and identify high-value customers.
 
-### 4.1 Daily Revenue Report
+## 5 Analytical SQL Queries
+
+This section provides example SQL queries used for reporting
+and business insights, such as revenue analysis, customer value,
+and product performance.
+
+### 5.1 Daily Revenue Report
+
+This query calculates the total revenue generated on a specific date.
+It is useful for daily sales tracking and financial reporting.
 
 ```sql
 SELECT
@@ -83,7 +130,10 @@ WHERE DATE(order_date) = DATE '2025-01-18'
 GROUP BY DATE(order_date);
 ```
 
-### 4.2 Top-Selling Products in a Month
+### 5.2 Top-Selling Products in a Month
+
+This query identifies the top-selling products for a given month based on total revenue.
+It helps evaluate product performance and supports inventory and marketing decisions.
 
 ```sql
 SELECT
@@ -99,7 +149,10 @@ ORDER BY total_revenue DESC
 LIMIT 3;
 ```
 
-### 4.3 Customers Who Spent More Than 500 in a Month
+### 5.3 Customers Who Spent More Than 500 in a Month
+
+This query finds high-value customers whose total spending exceeds a defined threshold within a specific month.
+It can be used for customer segmentation, loyalty programs, or targeted promotions.
 
 ```sql
 SELECT
@@ -114,7 +167,10 @@ HAVING SUM(o.total_amount) > 500
 ORDER BY total_spent DESC;
 ```
 
-### 4.4 Search for Products Containing the Word `camera`
+### 5.4 Search for Products Containing the Word camera
+
+This query searches for products whose name or description contains a specific keyword.
+It supports product search functionality commonly used in e-commerce platforms.
 
 ```sql
 SELECT *
@@ -123,7 +179,10 @@ WHERE name ILIKE '%camera%'
    OR description ILIKE '%camera%';
 ```
 
-### 4.5 Suggest Popular Products From the Same Category, Excluding the Selected Product
+### 5.5 Suggest Popular Products From the Same Category
+
+This query suggests popular products from the same category while excluding a selected product.
+It can be used to implement product recommendations such as “You may also like”.
 
 ```sql
 SELECT *
@@ -136,18 +195,143 @@ LIMIT 5;
 
 ---
 
-## 5. Denormalization Notes
-This section highlights fields that store redundant or snapshot data to improve query performance and simplify reporting,
+## 6 Data Generation
+
+This project includes helper SQL functions and scripts used to
+generate realistic test data and simplify database operations.
+These utilities are intended for development, testing, and demos.
+
+### 6.1 Customer Data Generation Function
+
+Generates sample customers (default 1 million rows) with unique emails, passwords, and placeholder names for testing and analytics.
+```sql
+CREATE OR REPLACE FUNCTION generate_customers_data(num_rows INTEGER DEFAULT 1000000)
+RETURNS VOID AS $$
+BEGIN
+    INSERT INTO customer
+        (email, password, first_name, last_name)
+    SELECT
+        'customer' || gs || '@example.com',
+        md5(random()::text),
+        'FirstName' || gs,
+        'LastName' || gs
+    FROM generate_series(1, num_rows) AS gs;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 6.2 Categories Data Generation Function
+
+ Generates sample products (default 100k rows) with names, descriptions, prices, stock quantities, and assigns them to categories.
+```sql
+CREATE OR REPLACE FUNCTION generate_products_data(num_rows INTEGER DEFAULT 100000)
+RETURNS VOID AS $$
+DECLARE
+    cat_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO cat_count FROM category;
+
+    INSERT INTO product (category_id, name, description, price, stock_quantity)
+    SELECT
+        ((gs - 1) % cat_count) + 1,
+        'Product ' || gs,
+        'Description for product ' || gs,
+        gs,
+        gs
+    FROM generate_series(1, num_rows) AS gs;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 6.3 Products Data Generation Function
+
+Generates sample products (default 100k rows) with names, descriptions, prices, stock quantities, and assigns them to categories.
+```sql
+CREATE OR REPLACE FUNCTION generate_products_data(num_rows INTEGER DEFAULT 100000)
+RETURNS VOID AS $$
+DECLARE
+    cat_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO cat_count FROM category;
+
+    INSERT INTO product (category_id, name, description, price, stock_quantity)
+    SELECT
+        ((gs - 1) % cat_count) + 1,
+        'Product ' || gs,
+        'Description for product ' || gs,
+        gs,
+        gs
+    FROM generate_series(1, num_rows) AS gs;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 6.4 Orders and Order Details Generation Function
+
+Generates sample orders and associated order details (default 2.5 million rows) with random customers, products, dates, quantities, and prices.
+```sql
+CREATE OR REPLACE FUNCTION generate_orders_and_details_complete(
+    num_orders INTEGER DEFAULT 2500000
+)
+RETURNS VOID AS $$
+DECLARE
+    cus_count INTEGER;
+    prod_count INTEGER;
+BEGIN
+    TRUNCATE order_details CASCADE;
+    TRUNCATE orders CASCADE;
+
+    SELECT COUNT(*) INTO cus_count FROM customer;
+    SELECT COUNT(*) INTO prod_count FROM product;
+
+    WITH new_orders AS (
+        INSERT INTO orders (customer_id, order_date, total_amount, customer_name)
+        SELECT
+            floor(random() * cus_count + 1)::INTEGER,
+            CURRENT_DATE - (random() * 1825)::INTEGER,
+            (random() * 1000 + 10)::DECIMAL(10,2),
+            CONCAT(c.first_name, ' ', c.last_name)
+        FROM generate_series(1, num_orders) AS gs
+        CROSS JOIN LATERAL (
+            SELECT first_name, last_name
+            FROM customer
+            WHERE customer_id = floor(random() * cus_count + 1)::INTEGER
+        ) AS c
+        RETURNING order_id
+    )
+    INSERT INTO order_details (order_id, product_id, unit_price, quantity)
+    SELECT
+        o.order_id,
+        floor(random() * prod_count + 1)::INTEGER,
+        (random() * 500 + 5)::DECIMAL(10,2),
+        floor(random() * 10 + 1)::INTEGER
+    FROM new_orders o
+    CROSS JOIN generate_series(1, floor(random() * 4 + 1)::INTEGER) AS item_num;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+---
+
+## 7 Denormalization Notes
+
+Certain fields are intentionally denormalized to improve query
+performance and preserve historical accuracy.
+
+### 7.1 Add customer_name into `orders` table
 
 The `orders` table includes a denormalized `customer_name` column.  
-This stores the customer's full name at the time of order creation.  
+This stores the customer's full name at the time of order creation.
+
 ```sql
 ALTER TABLE order
 ADD COLUMN customer_name VARCHAR(200);
 ```
 
 Benefits:
+
 - Faster reporting queries that list orders with customer names
 - No need to join with `customers`
 - Historical accuracy preserved even if the customer later updates their name
+
 ---
