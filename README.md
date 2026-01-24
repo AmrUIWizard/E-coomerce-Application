@@ -197,9 +197,7 @@ LIMIT 5;
 
 ## 6 Data Generation
 
-This project includes helper SQL functions and scripts used to
-generate realistic test data and simplify database operations.
-These utilities are intended for development, testing, and demos.
+This project includes helper SQL functions and scripts used to generate realistic test data and simplify database operations. These utilities are intended for development, testing, and demos.
 
 ### 6.1 Customer Data Generation Function
 
@@ -327,13 +325,23 @@ $$ LANGUAGE plpgsql;
 ```
 
 ---
+## 7 Query Performance Optimization
+This section documents SQL query optimization using `EXPLAIN ANALYZE` execution plans, comparing performance before and after optimization for our e-commerce application.
 
-## 7 Denormalization Notes
+| Description                         | Original Query                                                                                                                                                                                    | Execution Time (Before)                                                                                                                                              | Optimization Technique                                                                                                                                                                               | Rewritten Query                                                                                                                                                                                                                                                     | Execution Time (After)                                                                                                                                                           |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Total Products per Category**     | `SELECT C.CATEGORY_ID, C.CATEGORY_NAME, COUNT(P.PRODUCT_ID) FROM CATEGORY C LEFT JOIN PRODUCT P ON C.CATEGORY_ID = P.CATEGORY_ID GROUP BY C.CATEGORY_ID, C.CATEGORY_NAME ORDER BY C.CATEGORY_ID;` | **102.976 ms**  <br>• Seq Scan: 15.7 ms (100k rows)  <br>• Hash Right Join: 32.3 ms  <br>• HashAggregate: 16.2 ms  <br>• Sort: 0.1 ms  <br>• Rows: 100,000 processed | **• Query:** Correlated subquery pattern  <br>**• Index:** Created covering index for index-only scans  <br>**• Impact:** Eliminated sequential scan, enabled index-only processing                  | `CREATE INDEX idx_product_category_covering ON product(category_id, product_id);`  <br>  <br>`SELECT c.category_id, c.category_name, (SELECT COUNT(*) FROM product p WHERE p.category_id = c.category_id) as product_count FROM category c ORDER BY c.category_id;` | **54.430 ms**  <br>• Index Scan (category): 0.5 ms  <br>• SubPlan loops: 100 times  <br>• Index Only Scan: 0.4 ms per loop  <br>• Heap Fetches: 0  <br>• Memory: Minimal per-row |
+| **Top 10 Customers by Total Spend** | `SELECT o.customer_id, o.customer_name, SUM(o.total_amount) AS total_spent FROM orders o GROUP BY o.customer_id, o.customer_name ORDER BY total_spent DESC LIMIT 10;`                             | **2913 ms**  <br>• Seq Scan: 355 ms (2.5M rows)  <br>• HashAggregate: 1246 ms  <br>• Disk Spill: 160 MB  <br>• Memory: 8249 kB  <br>• Batches: 161                   | **• Index:** Created covering index `idx_orders_customer_covering`  <br>**• Impact:** Eliminated disk spills, enabled index-only scans  <br>**• Technique:** Same query structure with optimal index | `CREATE INDEX idx_orders_customer_covering ON orders(customer_id, customer_name) INCLUDE (total_amount);`  <br>  <br>Same query structure                                                                                                                           | **1430 ms**  <br>• Index Only Scan: 555 ms  <br>• GroupAggregate: 718 ms  <br>• No Disk Spill: 0 MB  <br>• Memory: In-memory only  <br>• Heap Fetches: 0                         |
+
+
+---
+
+## 8 Denormalization Notes
 
 Certain fields are intentionally denormalized to improve query
 performance and preserve historical accuracy.
 
-### 7.1 Add customer_name into `orders` table
+### 8.1 Add customer_name into `orders` table
 
 The `orders` table includes a denormalized `customer_name` column.  
 This stores the customer's full name at the time of order creation.
